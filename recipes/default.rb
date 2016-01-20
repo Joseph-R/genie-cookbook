@@ -4,6 +4,12 @@
 #
 # Copyright (c) 2016 Joe Reid, All Rights Reserved.
 
+genie_home = "/usr/share/genie"
+genie_download_path = "#{Chef::Config[:file_cache_path]}/genie-web-#{node['genie']['version']}.war"
+genie_download_source = "https://bintray.com/artifact/download/netflixoss/maven/com/netflix/genie/genie-web/#{node['genie']['version']}/genie-web-#{node['genie']['version']}.war"
+catalina_home = "/usr/share/tomcat"
+list_formatting_URL = "https://raw.githubusercontent.com/Netflix/genie/#{node['genie']['version']}/root/apps/tomcat/conf/listings.xsl"
+
 # BUILD GENIE, FOLLOWING INSTRUCTIONS POSTED @ https://github.com/Netflix/genie/wiki/Setup
 
 # PREREQUISITES
@@ -15,7 +21,7 @@ include_recipe "genie-cookbook::tomcat"
 
 ## Install binary version of Hadoop client.
 # check out https://github.com/caskdata/hadoop_cookbook/blob/master/attributes/default.rb?
-
+include_recipe "hadoop::default"
 
 # OPTIONAL
 
@@ -27,65 +33,70 @@ include_recipe "genie-cookbook::postgres"
 ## Install binary distributions of optional clients like Hive/Pig/Presto etc., 
 ## including the command-line scripts that launch these jobs respectively.
 
-# check out https://github.com/caskdata/hadoop_cookbook/blob/master/attributes/default.rb?
-
-# include_recipe "apache_hadoop::pig_client"
-# include_recipe "apache_hadoop::hbase_client"
-
-
+include_recipe "hadoop::hbase"
+include_recipe "hadoop::pig"
 
 # Get the Genie WAR
 ## Download the Binary (Recommended)
 
 remote_file "Download Genie WAR file for #{node['genie']['version']}" do 
-  path    "#{Chef::Config[:file_cache_path]}/genie-web-#{node['genie']['version']}.war"
-  source  "https://bintray.com/artifact/download/netflixoss/maven/com/netflix/genie/genie-web/#{node['genie']['version']}/genie-web-#{node['genie']['version']}.war"
+  path    "#{genie_download_path}"
+  source  "#{genie_download_source}"
   # show_progress true      # Awaiting PR - https://github.com/chef/chef/issues/2812
   retry_delay 5
   retries 12
 end
 
 
-# Assumes you've set CATALINA_HOME to be the root of your Tomcat deployment. If not
+# DEPLOY AND CONFIGURE
 
-# export CATALINA_HOME=/your/path/to/tomcat
-# Also if Tomcat already has a ROOT app in $CATALINA_HOME/webapps you should move it or delete it.
+## PREREQUISITES
+## Assumes you've set CATALINA_HOME to be the root of your Tomcat deployment. If not
+### export CATALINA_HOME=/your/path/to/tomcat
+## Also if Tomcat already has a ROOT app in $CATALINA_HOME/webapps you should move it or delete it.
 
 # UNZIP THE WAR
+## mkdir $CATALINA_HOME/webapps/ROOT &&\
 
-# mkdir $CATALINA_HOME/webapps/ROOT &&\
-# cd $CATALINA_HOME/webapps/ROOT &&\
-# jar xf <where you downloaded or build the war>/genie-web-{version}.war
+directory "#{catalina_home}/webapps/ROOT" do
+  owner 'root'
+  group 'tomcat'
+  mode  '0755'
+end
+
+## cd $CATALINA_HOME/webapps/ROOT &&\
+## jar xf <where you downloaded or build the war>/genie-web-{version}.war
+execute "Unpack Genie war file in #{catalina_home}/webapps/ROOT" do
+  command "jar -xf #{genie_download_path}"
+  cwd     "#{catalina_home}/webapps/ROOT"
+  action  :run
+end
+
 
 # MAKE GENIE-JOBS AND DOWNLOAD LISTING FORMATTING
+## mkdir $CATALINA_HOME/webapps/genie-jobs &&\
+directory "#{catalina_home}/webapps/genie-jobs" do
+  owner 'root'
+  group 'tomcat'
+  mode  '0755'
+end
 
-# mkdir $CATALINA_HOME/webapps/genie-jobs &&\
-# wget -q -P $CATALINA_HOME/conf 'https://raw.githubusercontent.com/Netflix/genie/{version}/root/apps/tomcat/conf/listings.xsl'
+## wget -q -P $CATALINA_HOME/conf 'https://raw.githubusercontent.com/Netflix/genie/{version}/root/apps/tomcat/conf/listings.xsl'
+##@todo - Can we duplicate the -P flag with a remote_file resource?  If so, do it and deprecate.
+package 'wget'
 
-# ENABLE LISTINGS IN TOMCAT
+execute "Download list formatting" do
+  command "wget -q -P #{catalina_home}/conf '#{list_formatting_URL}'"
+  cwd     "#{catalina_home}"
+  action  :run
+end
 
-# Enabling listings in Tomcat will allow users to view job results via their browser.
 
-# Edit $CATALINA_HOME/conf/web.xml to enable listings by changing the default servlet
+# ENABLE LISTINGS IN TOMCAT TO ALLOW USERS TO VIEW JOB RESULTS VIA BROWSER
 
-# <init-param>
-#     <param-name>listings</param-name>
-#     <param-value>false</param-value>
-# </init-param>
-# to
+## Edit $CATALINA_HOME/conf/web.xml to enable listings by changing the default servlet
 
-# <init-param>
-#     <param-name>listings</param-name>
-#     <param-value>true</param-value>
-# </init-param>
-# Also add path to the listings.xsl file you downloaded above (replace $CATALINA_HOME with full path on your system)
-
-# <init-param>
-#     <param-name>globalXsltFile</param-name>
-#     <param-value>$CATALINA_HOME/conf/listings.xsl</param-value>
-# </init-param>
-# Default servlet should look something like this when you're done
-
+# Target should look like this:
 # <servlet>
 #     <servlet-name>default</servlet-name>
 #     <servlet-class>org.apache.catalina.servlets.DefaultServlet</servlet-class>
@@ -104,6 +115,17 @@ end
 #     <load-on-startup>1</load-on-startup>
 # </servlet>
 
+template "#{catalina_home}/conf/web.xml" do
+  source 'tomcat_web.xml.erb'
+  mode '644'
+  owner 'tomcat'
+  group 'tomcat'
+  variables(
+    :listings => "true",
+    :globalXsltFile => "#{catalina_home}/conf/listings.xsl"
+  )
+end
+
 
 # MODIFY DATABASE CONNECTION SETTINGS (OPTIONAL)
 
@@ -112,6 +134,7 @@ end
 # You'll find the file in $CATALINA_HOME/webapps/ROOT/WEB-INF/classes
 
 # Edit your configurations as needed. If you're not using MySQL you'll have to chnage the driver class. The connection url will have to be changed if it's not localhost. Currently password is set to nothing so if you have one configured you should set it. Note if you want to use MySQL you'll need to change the spring active profile at runtime which is described below.
+
 
 # UPDATE SWAGGER ENDPOINT (OPTIONAL)
 
@@ -138,10 +161,11 @@ end
 # sed -i "s/localhost/${EC2_PUBLIC_HOSTNAME}/g" $CATALINA_HOME/webapps/ROOT/WEB-INF/classes/genie-swagger.xml
 # Once you've made these changes when you bring up Genie you can navigate to http://{genieHost}:{port}/docs/api to begin using the Swagger UI.
 
+
 # DOWNLOAD GENIE SCRIPTS
 
-# Genie leverages several scripts to launch and kill client processes when jobs are submitted. You should create a directory on your system (we'll refer to this as GENIE_HOME) to store these scripts and you'll need to reference this location in the property file configuration in the next section.
-# Download all the Genie scripts that are used to run jobs
+## Genie leverages several scripts to launch and kill client processes when jobs are submitted. You should create a directory on your system (we'll refer to this as GENIE_HOME) to store these scripts and you'll need to reference this location in the property file configuration in the next section.
+## Download all the Genie scripts that are used to run jobs
 
 # mkdir -p $GENIE_HOME &&\
 # wget -q -P $GENIE_HOME 'https://raw.githubusercontent.com/Netflix/genie/{version}/root/apps/genie/bin/jobkill.sh' &&\
@@ -154,10 +178,30 @@ end
 # chmod 755 $GENIE_HOME/timeout3
 # On line 228 of joblauncher.sh you may have to modify the hadoop conf location. Older Hadoop distros have $HADOOP_HOME/conf/ and newer ones seem to store their conf files in $HADOOP_HOME/etc/hadoop/.
 
+directory "#{genie_home}" do
+  owner 'root'
+  group 'tomcat'
+  mode  '0755'
+end
+
+%w{jobkill.sh joblauncher.sh localCleanup.py timeout3}.each do |script|
+  remote_file "Download #{script}" do 
+    path    "#{genie_home}/#{script}"
+    source  "https://raw.githubusercontent.com/Netflix/genie/#{node['genie']['version']}/root/apps/genie/bin/#{script}"
+    # show_progress true      # Awaiting PR - https://github.com/chef/chef/issues/2812
+    owner 'root'
+    group 'tomcat'
+    mode '0755'
+    retry_delay 5
+    retries 12
+  end
+end
+
+
+
 # MODIFY GENIE PROPERTIES
 
 # Genie properties will be located in $CATALINA_HOME/webapps/ROOT/WEB-INF/classes/genie.properties.
-
 # Environment specific properties will be in $CATALINA_HOME/webapps/ROOT/WEB-INF/classes/genie-{env}.properties. These properties will be loaded by Archaius using the archaius.deployment.environment property in CATALINA_OPTS.
 
 # You should review all the properties in the file but in particular pay attention to the following and set them as need be for your configuration.
@@ -173,6 +217,25 @@ end
 # com.netflix.genie.server.job.manager.presto.command.cp
 # com.netflix.genie.server.job.manager.presto.command.mkdir
 # For further information on customizing your Genie install see Customization and Options.
+
+template "#{catalina_home}/webapps/ROOT/WEB-INF/classes/genie.properties" do
+  source 'genie.properties.erb'
+  mode '644'
+  owner 'root'
+  group 'root'
+  variables(
+    :tomcat_port => node['genie']['tomcat']['port'],
+    :genie_home => "#{genie_home}",
+    :genie_version => node['genie']['version'],
+    :java_home => "#{node['java']['java_home']}",
+    :aws_access_key => node['genie']['access_key_id'] ? "" : nil,
+    :aws_secret_key => node['genie']['secret_access_key'] ? "" : nil,
+    :max_running_jobs => node['genie']['max_running_jobs'],
+    :forward_jobs_threshold => node['genie']['forward_jobs_threshold'],
+    :hadoop_home => node['hadoop']['home']
+  )
+end
+
 
 # Run Tomcat
 
