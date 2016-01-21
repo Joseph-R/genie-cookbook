@@ -20,11 +20,11 @@ node.default['tomcat']['environment'] = [
     },
     {
       "VariableName" => "CATALINA_OPTS",
-      "VariableValue" => "-Dspring.profiles.active=prod -Darchaius.deployment.applicationId=genie -Dnetflix.datacenter=cloud -Darchaius.deployment.environment=prod"
+      "VariableValue" => "#{node['tomcat']['catalina_options']}"
     },
     {
       "VariableName" => "JAVA_HOME",
-      "VariableValue" => node['java']['java_home']
+      "VariableValue" => "#{node['java']['java_home']}"
     }
 ]
 

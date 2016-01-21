@@ -224,7 +224,7 @@ template "#{catalina_home}/webapps/ROOT/WEB-INF/classes/genie.properties" do
   owner 'root'
   group 'root'
   variables(
-    :tomcat_port => node['genie']['tomcat']['port'],
+    :tomcat_port => node['tomcat']['port'],
     :genie_home => "#{genie_home}",
     :genie_version => node['genie']['version'],
     :java_home => "#{node['java']['java_home']}",
