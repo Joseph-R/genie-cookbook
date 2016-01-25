@@ -33,3 +33,6 @@ suites:
     attributes:
       hadoop:
         home: '/usr/lib/hadoop'
+      genie:
+        max_running_jobs: "50"
+        forward_jobs_threshold: "60"
