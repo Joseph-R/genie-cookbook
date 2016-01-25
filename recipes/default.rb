@@ -228,8 +228,8 @@ template "#{catalina_home}/webapps/ROOT/WEB-INF/classes/genie.properties" do
     :genie_home => "#{genie_home}",
     :genie_version => node['genie']['version'],
     :java_home => "#{node['java']['java_home']}",
-    :aws_access_key => node['genie']['access_key_id'] ? "" : nil,
-    :aws_secret_key => node['genie']['secret_access_key'] ? "" : nil,
+    :aws_access_key => node['genie']['access_key_id'] ? "KEY" : nil,
+    :aws_secret_key => node['genie']['secret_access_key'] ? "SECRET" : nil,
     :max_running_jobs => node['genie']['max_running_jobs'],
     :forward_jobs_threshold => node['genie']['forward_jobs_threshold'],
     :hadoop_home => node['hadoop']['home']
