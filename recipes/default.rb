@@ -222,7 +222,7 @@ template "#{catalina_home}/webapps/ROOT/WEB-INF/classes/genie.properties" do
   source 'genie.properties.erb'
   mode '644'
   owner 'root'
-  group 'root'
+  group 'tomcat'
   variables(
     :tomcat_port => node['tomcat']['port'],
     :genie_home => "#{genie_home}",
