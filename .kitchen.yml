@@ -30,3 +30,6 @@ suites:
         memory: 2048
     run_list:
       - recipe[genie-cookbook::default]
+    attributes:
+      hadoop:
+        home: '/usr/lib/hadoop'
