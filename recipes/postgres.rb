@@ -31,12 +31,10 @@ postgresql_database "#{node['genie']['postgres']['database']}" do
   action     :create
 end
 
-# Builds each local DB with one user as both super user and admin.
+# Give Genie user full permissions.
 postgresql_database_user "#{node['genie']['postgres']['username']}" do
   connection postgresql_connection_info
   database_name "#{node['genie']['postgres']['database']}"
   privileges [:all]
   action :grant
 end
-
-

@@ -5,9 +5,12 @@
 # Copyright (c) 2016 Joe Reid, All Rights Reserved.
 
 genie_home = "/usr/share/genie"
+catalina_home = "/usr/share/tomcat"
+
 genie_download_path = "#{Chef::Config[:file_cache_path]}/genie-web-#{node['genie']['version']}.war"
 genie_download_source = "https://bintray.com/artifact/download/netflixoss/maven/com/netflix/genie/genie-web/#{node['genie']['version']}/genie-web-#{node['genie']['version']}.war"
-catalina_home = "/usr/share/tomcat"
+
+postgres_jar = "postgresql-9.4.1207.jar"
 list_formatting_URL = "https://raw.githubusercontent.com/Netflix/genie/#{node['genie']['version']}/root/apps/tomcat/conf/listings.xsl"
 
 # BUILD GENIE, FOLLOWING INSTRUCTIONS POSTED @ https://github.com/Netflix/genie/wiki/Setup
@@ -61,7 +64,7 @@ end
 directory "#{catalina_home}/webapps/ROOT" do
   owner 'root'
   group 'tomcat'
-  mode  '0755'
+  mode  '755'
 end
 
 ## cd $CATALINA_HOME/webapps/ROOT &&\
@@ -82,7 +85,8 @@ directory "#{catalina_home}/webapps/genie-jobs" do
 end
 
 ## wget -q -P $CATALINA_HOME/conf 'https://raw.githubusercontent.com/Netflix/genie/{version}/root/apps/tomcat/conf/listings.xsl'
-##@todo - Can we duplicate the -P flag with a remote_file resource?  If so, do it and deprecate.
+##@todo - Can we duplicate the -P flag with a remote_file resource?  
+##If so, do it and deprecate this execute block and package dependency.
 package 'wget'
 
 execute "Download list formatting" do
@@ -135,6 +139,32 @@ end
 
 # Edit your configurations as needed. If you're not using MySQL you'll have to chnage the driver class. The connection url will have to be changed if it's not localhost. Currently password is set to nothing so if you have one configured you should set it. Note if you want to use MySQL you'll need to change the spring active profile at runtime which is described below.
 
+remote_file "Download #{postgres_jar}" do 
+  action  :create_if_missing
+  path    "#{catalina_home}/webapps/ROOT/WEB-INF/lib/#{postgres_jar}"
+  source  "https://jdbc.postgresql.org/download/#{postgres_jar}"
+  # show_progress true      # Awaiting PR - https://github.com/chef/chef/issues/2812
+  owner 'root'
+  group 'root'
+  mode '644'
+  retry_delay 5
+  retries 12
+  notifies :restart, 'service[tomcat]', :delayed
+end
+
+template "#{catalina_home}/webapps/ROOT/WEB-INF/classes/genie-jpa.xml" do
+  source 'genie-jpa.xml.erb'
+  mode '644'
+  owner 'root'
+  group 'root'
+  variables(
+    :data_source_class => node['genie']['postgres']['data_source_class'],
+    :driverclass => node['genie']['postgres']['driver_class'],
+    :url_connection_string => node['genie']['postgres']['URL_connection_string'],
+    :username => node['genie']['postgres']['username'],
+    :password => node['genie']['postgres']['password'],
+  )
+end
 
 # UPDATE SWAGGER ENDPOINT (OPTIONAL)
 
@@ -181,7 +211,7 @@ end
 directory "#{genie_home}" do
   owner 'root'
   group 'tomcat'
-  mode  '0755'
+  mode  '755'
 end
 
 %w{jobkill.sh joblauncher.sh localCleanup.py timeout3}.each do |script|
@@ -191,7 +221,7 @@ end
     # show_progress true      # Awaiting PR - https://github.com/chef/chef/issues/2812
     owner 'root'
     group 'tomcat'
-    mode '0755'
+    mode '755'
     retry_delay 5
     retries 12
   end
@@ -218,18 +248,21 @@ end
 # com.netflix.genie.server.job.manager.presto.command.mkdir
 # For further information on customizing your Genie install see Customization and Options.
 
+#@todo - Add support for logging to S3 and configuring email notifications.
 template "#{catalina_home}/webapps/ROOT/WEB-INF/classes/genie.properties" do
   source 'genie.properties.erb'
   mode '644'
   owner 'root'
-  group 'tomcat'
+  group 'root'
   variables(
+    :hostname => node['hostname'],
     :tomcat_port => node['tomcat']['port'],
-    :genie_home => "#{genie_home}",
+    :genie_job_path => "#{catalina_home}/webapps/genie-jobs",
+    :script_home => "#{genie_home}/",
     :genie_version => node['genie']['version'],
     :java_home => "#{node['java']['java_home']}",
-    :aws_access_key => node['genie']['access_key_id'] ? "KEY" : nil,
-    :aws_secret_key => node['genie']['secret_access_key'] ? "SECRET" : nil,
+    :aws_access_key => node['genie']['access_key_id'] ? node['genie']['access_key_id'] : "KEY",
+    :aws_secret_key => node['genie']['secret_access_key'] ? node['genie']['secret_access_key'] : "SECRET",
     :max_running_jobs => node['genie']['max_running_jobs'],
     :forward_jobs_threshold => node['genie']['forward_jobs_threshold'],
     :hadoop_home => node['hadoop']['home']
@@ -249,3 +282,7 @@ end
 # $CATALINA_HOME/bin/startup.sh
 # Note that the CATALINA_OPTS environment variable must be set, and available to the Tomcat startup script.
 
+
+service "tomcat" do
+  action :nothing
+end
