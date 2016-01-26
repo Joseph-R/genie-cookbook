@@ -66,11 +66,12 @@ com.netflix.genie.server.job.resource.prefix=genie/v2/jobs
 
 # If this is commented out, Genie will use InetAddress.getLocalHost() in DC,
 # or the environment variable EC2_PUBLIC_HOSTNAME in the cloud
-# com.netflix.genie.server.host=localhost
+#com.netflix.genie.server.host=<%= @hostname %>
+com.netflix.genie.server.host=localhost
 
 # Location of genie scripts - currently part of genie-web/conf/system/apps/genie/bin
 # Change this appropriately to point to above location
-com.netflix.genie.server.sys.home=<%= @genie_home %>
+com.netflix.genie.server.sys.home=<%= @script_home %>
 
 # The relative path for the prefix directory inside Tomcat's "webapps/"
 # that Genie will use for its working directory
@@ -80,7 +81,7 @@ com.netflix.genie.server.job.dir.prefix=genie-jobs
 # Actual location where output directories are created
 # Create a symlink from the above directory to here
 # Or simply provide the full path of the above directory
-com.netflix.genie.server.user.working.dir=/mnt/tomcat/genie-jobs
+com.netflix.genie.server.user.working.dir=<%= @genie_job_path %>
 
 
 ###########################################################################
@@ -146,7 +147,7 @@ com.netflix.genie.server.job.manager.presto.command.mkdir=<%= @hadoop_home %>/bi
 # Connection Details for Presto Master used by Presto Job Manager. Cluster name taken from cluster config.
 # Example http://<clustername>.localhost:8080 is where requests will go from presto client
 com.netflix.genie.server.job.manager.presto.protocol=http://
-com.netflix.genie.server.job.manager.presto.master.domain=.localhost:8080
+com.netflix.genie.server.job.manager.presto.master.domain=.localhost:<%= @tomcat_port %>
 
 # How long to sleep between checks of presto processes
 com.netflix.genie.server.job.manager.presto.sleeptime = 500
