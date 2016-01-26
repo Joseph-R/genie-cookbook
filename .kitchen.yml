@@ -25,7 +25,7 @@ platforms:
 suites:
   - name: default
     driver:
-      vm_hostname: false
+      vm_hostname: genie.local
       customize:
         memory: 2048
     run_list:
