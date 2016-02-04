@@ -17,15 +17,17 @@ platforms:
     driver_config:
       box: centos_6.5_packer
       box_url: https://s3.amazonaws.com/o2o-public/centos_6.5_packer_provisionerless.box
-  - name: centos-7.1
-    driver_config:
-      box: centos_7.1
-      box_url: https://github.com/holms/vagrant-centos7-box/releases/download/7.1.1503.001/CentOS-7.1.1503-x86_64-netboot.box
+  # - name: centos-7.1
+  #   driver_config:
+  #     box: centos_7.1
+  #     box_url: https://github.com/holms/vagrant-centos7-box/releases/download/7.1.1503.001/CentOS-7.1.1503-x86_64-netboot.box
 
 suites:
   - name: default
     driver:
       vm_hostname: genie.local
+      network:
+      - ["private_network", {ip: "33.33.33.114"}]
       customize:
         memory: 2048
     run_list:

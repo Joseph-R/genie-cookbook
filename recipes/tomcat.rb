@@ -1,36 +1,39 @@
 # Install Tomcat as part of the setup for Genie - https://github.com/Netflix/genie/wiki/Setup
 # See https://github.com/chef-cookbooks/tomcat for use and example code.
 
-# node.default['catalina']['home'] = "#{node['hadoop']['home']}/apache-tomcat-#{node['tomcat']['version']}"
+node.default['tomcat']['base_version'] = '7'
+node.default['tomcat']['port'] = 7000
+node.default['tomcat']['ssl_port'] = 8443
+node.default['tomcat']['java_options'] = "${JAVA_OPTS} -Xmx128M -Djava.awt.headless=true"
 
-# Set ENV variables for the Chef shell and any child processes spawned by this recipe.
-#@todo - Deprecate.  https://github.com/chef-cookbooks/tomcat/pull/171
-## ENV['TOMCAT_VERSION'] = node['genie']['tomcat']['base_version']
-## ENV['JAVA_HOME'] = node['java']['java_home']
-## ENV['CATALINA_HOME'] = node['catalina']['home']
-## ENV['CATALINA_OPTS'] = "-Darchaius.deployment.applicationId=genie -Dnetflix.datacenter=cloud"
+# if node['cloud'] == true
+#   node.default['tomcat']['catalina_options'] = "-Dspring.profiles.active=prod -Darchaius.deployment.applicationId=genie -Dnetflix.datacenter=cloud -Darchaius.deployment.environment=prod"
+# else
+#   node.default['tomcat']['catalina_options'] = "-Dspring.profiles.active=prod -Darchaius.deployment.applicationId=genie -Darchaius.deployment.environment=prod"
+# end
 
 
 # Don't ask me, man.  I didn't write this syntax into the cookbook.
+# Doesn't seem to accept lazy attribute evaluation
 # https://github.com/chef-cookbooks/tomcat/pull/171
-node.default['tomcat']['environment'] = [ 
-    {
-      "VariableName" => "CATALINA_HOME",
-      "VariableValue" => "/usr/share/tomcat"
-    },
-    {
-      "VariableName" => "CATALINA_OPTS",
-      "VariableValue" => "#{node['tomcat']['catalina_options']}"
-    },
-    {
-      "VariableName" => "JAVA_HOME",
-      "VariableValue" => "#{node['java']['java_home']}"
-    }
-]
+# node.default['tomcat']['environment'] = [ 
+#     {
+#       "VariableName" => "CATALINA_HOME",
+#       "VariableValue" => "/usr/share/tomcat"
+#     },
+#     {
+#       "VariableName" => "CATALINA_OPTS",
+#       "VariableValue" => "#{node['tomcat']['catalina_options']}"
+#     },
+#     {
+#       "VariableName" => "JAVA_HOME",
+#       "VariableValue" => "#{node['java']['java_home']}"
+#     }
+# ]
 
 # Hack until https://github.com/chef-cookbooks/tomcat/issues/148 gets resolved...
 ### Changed value(s):
-node.default['tomcat']['base_version'] = '7'
+# node.default['tomcat']['base_version'] = '7'
 
 # ### Unchanged values that rely on above being different:
 suffix = node['tomcat']['base_version'].to_i < 7 ? node['tomcat']['base_version'] : ''
@@ -50,3 +53,14 @@ node.default['tomcat']['deploy_manager_packages'] = ["tomcat#{suffix}-admin-weba
 
 # Install and configure Tomcat with cookbook attributes.
 include_recipe "tomcat::default"
+
+
+# Legacy code - Replace or remove.
+# node.default['catalina']['home'] = "#{node['hadoop']['home']}/apache-tomcat-#{node['tomcat']['version']}"
+
+# Set ENV variables for the Chef shell and any child processes spawned by this recipe.
+#@todo - Deprecate.  https://github.com/chef-cookbooks/tomcat/pull/171
+## ENV['TOMCAT_VERSION'] = node['genie']['tomcat']['base_version']
+## ENV['JAVA_HOME'] = node['java']['java_home']
+## ENV['CATALINA_HOME'] = node['catalina']['home']
+## ENV['CATALINA_OPTS'] = "-Darchaius.deployment.applicationId=genie -Dnetflix.datacenter=cloud"
