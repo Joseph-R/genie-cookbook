@@ -58,3 +58,8 @@ genie_scripts.each do |script|
     it { should be_grouped_into 'tomcat' }
   end
 end
+
+# Test if Genie splash page is loading.  Assumes default port of 7000.
+describe command('curl localhost:7000') do
+  its(:stdout) { should match /<title>Genie<\/title>/ }
+end
