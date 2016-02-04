@@ -30,7 +30,7 @@ end
 
 describe file("#{catalina_home}/conf/web.xml") do
   it { should be_file }
-  it { should be_mode 644 }
+  it { should be_mode 664 }
   it { should be_owned_by 'tomcat' }
   it { should be_grouped_into 'tomcat' }
 end
